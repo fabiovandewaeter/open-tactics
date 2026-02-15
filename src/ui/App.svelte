@@ -1,12 +1,10 @@
 <script lang="ts">
-  import Board from "./components/Board.svelte";
   import IsoBoard from "./components/IsoBoard.svelte";
 </script>
 
 <main>
   <h1>Tactical Board — Prototype</h1>
   <IsoBoard />
-  <Board />
 </main>
 
 <style>
