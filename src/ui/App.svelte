@@ -5,8 +5,8 @@
 
 <main>
   <h1>Tactical Board — Prototype</h1>
-  <Board />
   <IsoBoard />
+  <Board />
 </main>
 
 <style>
