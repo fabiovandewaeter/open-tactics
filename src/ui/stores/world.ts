@@ -1,67 +1,65 @@
+// engine/world.ts
 import { writable } from "svelte/store"
 import type { World } from "../../engine/types"
-import { createEmptyWorld, spawnStructure, spawnUnit } from "../../engine/board"
+import { add_unit_to_level, create_default_world, spawn_structure, spawn_unit } from "../../engine/board"
 
-const initial = createEmptyWorld(10, 10)
+const initial_world = create_default_world();
+const initial_level = initial_world.levels[1];
 
 const UNIT_HEIGHT_REF = 40;
 
 // Les personnages
-spawnUnit(initial, {
-    name: "Rogue", hp: 30, maxHp: 30, pos: { x: 1, y: 1 }, team: "A", scale: 1.0, shape: "sprite"
+const unit_id_1 = spawn_unit(initial_world, {
+    name: "Rogue", pos: { x: 1, y: 1 }, max_stats: { max_hp: 30, map_mp: 5 }, scale: 1.0, shape: "sprite"
 })
-spawnUnit(initial, {
-    name: "Summon", hp: 20, maxHp: 20, pos: { x: 3, y: 2 }, team: "B", scale: 1.0, shape: "sprite"
+const unit_id_2 = spawn_unit(initial_world, {
+    name: "Summon", pos: { x: 3, y: 2 }, max_stats: { max_hp: 20, map_mp: 1 }, scale: 1.0, shape: "sprite"
 })
+
+add_unit_to_level(initial_level, unit_id_1);
+add_unit_to_level(initial_level, unit_id_2);
 
 // Les structures (Anciennement Slimes)
-spawnStructure(initial, {
-    name: "Sommet", pos: { x: 5, y: 5 }, shape: "cube", height: UNIT_HEIGHT_REF, walkable: true, elevationChange: UNIT_HEIGHT_REF
+spawn_structure(initial_level, {
+    name: "Sommet",
+    pos: { x: 5, y: 5 },
+    shape: "cube",
+    height: UNIT_HEIGHT_REF,
+    walkable: true,
+    elevation_change: UNIT_HEIGHT_REF
 })
-// spawnStructure(initial, {
-//     name: "Pente NE", pos: { x: 5, y: 6 }, shape: "wedge-ne", height: UNIT_HEIGHT_REF, walkable: true, elevationChange: UNIT_HEIGHT_REF
-// })
-// spawnStructure(initial, {
-//     name: "Pente NW", pos: { x: 6, y: 5 }, shape: "wedge-nw", height: UNIT_HEIGHT_REF, walkable: true, elevationChange: UNIT_HEIGHT_REF
-// })
-// spawnStructure(initial, {
-//     name: "Pente SE", pos: { x: 4, y: 5 }, shape: "wedge-se", height: UNIT_HEIGHT_REF, walkable: true, elevationChange: UNIT_HEIGHT_REF
-// })
-// spawnStructure(initial, {
-//     name: "Pente SW", pos: { x: 5, y: 4 }, shape: "wedge-sw", height: UNIT_HEIGHT_REF, walkable: true, elevationChange: UNIT_HEIGHT_REF
-// })
 
-spawnStructure(initial, {
+spawn_structure(initial_level, {
     name: "Marche",
     pos: { x: 5, y: 6 },
     shape: "step",
     height: UNIT_HEIGHT_REF,
     walkable: true,
-    elevationChange: UNIT_HEIGHT_REF / 2
+    elevation_change: UNIT_HEIGHT_REF / 2
 })
-spawnStructure(initial, {
+spawn_structure(initial_level, {
     name: "Marche",
     pos: { x: 6, y: 5 },
     shape: "step",
     height: UNIT_HEIGHT_REF,
     walkable: true,
-    elevationChange: UNIT_HEIGHT_REF / 2
+    elevation_change: UNIT_HEIGHT_REF / 2
 })
-spawnStructure(initial, {
+spawn_structure(initial_level, {
     name: "Marche",
     pos: { x: 4, y: 5 },
     shape: "step",
     height: UNIT_HEIGHT_REF,
     walkable: true,
-    elevationChange: UNIT_HEIGHT_REF / 2
+    elevation_change: UNIT_HEIGHT_REF / 2
 })
-spawnStructure(initial, {
+spawn_structure(initial_level, {
     name: "Marche",
     pos: { x: 5, y: 4 },
     shape: "step",
     height: UNIT_HEIGHT_REF,
     walkable: true,
-    elevationChange: UNIT_HEIGHT_REF / 2
+    elevation_change: UNIT_HEIGHT_REF / 2
 })
 
-export const worldStore = writable<World>(initial)
+export const world_store = writable<World>(initial_world)
