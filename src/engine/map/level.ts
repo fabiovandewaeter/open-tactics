@@ -30,19 +30,20 @@ export function remove_unit_from_level(level: Level, unit_id: UnitId) {
     level.units = level.units.filter(id => id !== unit_id);
 }
 
+/** Only checks if destination is accessible (not full path) then moves the unit */
 export function move_unit_in_level(level: Level, unit_id: UnitId, to: Coord, world: World): boolean {
     const unit: Unit = world.units[unit_id];
-    if (!unit) {
-        return false
-    }
-    if (!level.units.includes(unit_id)) {
-        return false;
-    }
+    if (!unit) return false;
+    if (!level.units.includes(unit_id)) return false;
+    if (to.x < 0 || to.y < 0 || to.x >= level.board.width || to.y >= level.board.height) return false;
 
-    if (to.x < 0 || to.y < 0 || to.x >= level.board.width || to.y >= level.board.height) return false
+    const blocked = Object.values(level.structures).some(
+        s => s.pos.x === to.x && s.pos.y === to.y && !s.walkable
+    );
+    if (blocked) return false;
 
-    unit.pos = { x: to.x, y: to.y }
-    return true
+    unit.pos = { x: to.x, y: to.y };
+    return true;
 }
 
 export function get_occupied_cells(level: Level, world: World, exclude_unit_id?: number): Set<string> {

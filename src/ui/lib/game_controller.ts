@@ -121,7 +121,7 @@ export function finish_turn() {
  * - Déduit les MP selon path.length - 1.
  * - Garde le tour si des MP restent.
  */
-export async function player_attempt_move(path: Coord[], reachable_cells: Set<string>) {
+export async function player_combat_move(path: Coord[], reachable_cells: Set<string>) {
     if (!get(isPlayerTurn) || get(isAnimating)) return;
 
     const w = get(world_store);
@@ -168,6 +168,35 @@ export async function player_attempt_move(path: Coord[], reachable_cells: Set<st
     if (remaining_mp <= 0) {
         console.log("Plus de MP, fin du tour automatique.");
         finish_turn();
+    }
+}
+
+/** used to know if another click happend and current path changed */
+let move_token = 0; // token global
+export async function player_explore_move(path: Coord[], unit_id: UnitId) {
+    if (get(isAnimating)) {
+        // Annule le déplacement en cours en incrémentant le token
+        move_token++;
+    }
+
+    const my_token = ++move_token;
+    isAnimating.set(true);
+
+    for (let i = 1; i < path.length; i++) {
+        // Si un nouveau déplacement a été demandé, on arrête
+        if (move_token !== my_token) return;
+
+        const step = path[i];
+        world_store.update(w => {
+            const level = get_active_level(w);
+            move_unit_in_level(level, unit_id, step, w);
+            return w;
+        });
+        await sleep(150);
+    }
+
+    if (move_token === my_token) {
+        isAnimating.set(false);
     }
 }
 

@@ -7,7 +7,8 @@
         finish_turn,
         isAnimating,
         isPlayerTurn,
-        player_attempt_move,
+        player_combat_move,
+        player_explore_move,
         start_combat_from_current_level,
         start_turn_loop,
     } from "../lib/game_controller";
@@ -19,6 +20,7 @@
         get_occupied_cells,
     } from "../../engine/map/level";
     import { get_active_level } from "../../engine/world";
+    import { get } from "svelte/store";
 
     const TILE_W = 80;
     const TILE_H = 40;
@@ -174,25 +176,40 @@
     }
 
     async function cell_click(x: number, y: number) {
-        if (!$isPlayerTurn || $isAnimating) return;
-        if (world.state.mode !== "combat") return;
-
-        const combat = world.combats[world.state.combat_id];
-        const unit_id = get_current_unit_id(combat);
-        const unit = world.units[unit_id];
-        const occupied = get_occupied_cells(active_level, world, unit_id);
-
-        const path = find_path(
-            active_level,
-            world,
-            unit.pos,
-            { x, y },
-            occupied,
-        );
-        if (!path) return;
-
-        hovered_path = new Set();
-        await player_attempt_move(path, reachable_cells);
+        if (world.state.mode === "combat") {
+            if (!$isPlayerTurn || $isAnimating) return; // garde uniquement en combat
+            const combat = world.combats[world.state.combat_id];
+            const unit_id = get_current_unit_id(combat);
+            const unit = world.units[unit_id];
+            const occupied = get_occupied_cells(active_level, world, unit_id);
+            const path = find_path(
+                active_level,
+                world,
+                unit.pos,
+                { x, y },
+                occupied,
+            );
+            if (!path) return;
+            hovered_path = new Set();
+            await player_combat_move(path, reachable_cells);
+        } else {
+            // Pas de guard isAnimating ici — player_explore_move annule lui-même
+            const unit = units[0];
+            if (!unit) return;
+            const occupied = get_occupied_cells(active_level, world, unit.id);
+            // Le pathfinding repart DEPUIS LA POSITION ACTUELLE de l'unité (mid-animation)
+            const current_pos = get(world_store).units[unit.id].pos;
+            const path = find_path(
+                active_level,
+                world,
+                current_pos,
+                { x, y },
+                occupied,
+            );
+            if (!path || path.length < 2) return;
+            hovered_path = new Set();
+            await player_explore_move(path, unit.id);
+        }
     }
 
     $: render_items = (() => {
