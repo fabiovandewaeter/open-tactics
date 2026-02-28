@@ -1,6 +1,8 @@
 // engine/board.ts
 import type { Board, Coord, Level, LevelId, Structure, StructureId, Unit, UnitId, World } from "./types"
 
+export const MAX_STEP_HEIGHT = 20;
+
 export function create_board(width = 10, height = 10): Board {
     const tiles = [] as Board["tiles"];
     for (let y = 0; y < height; y++) {
@@ -99,7 +101,6 @@ export function move_unit_in_level(level: Level, unit_id: UnitId, to: Coord, wor
 
     const elevationDiff = Math.abs(targetElevation - currentElevation)
 
-    const MAX_STEP_HEIGHT = 20;
     if (elevationDiff > MAX_STEP_HEIGHT) {
         console.log(`Mouvement bloqué : La marche est trop haute (${elevationDiff} pixels) ! Max autorisé : ${MAX_STEP_HEIGHT}`);
         return false;
@@ -111,4 +112,14 @@ export function move_unit_in_level(level: Level, unit_id: UnitId, to: Coord, wor
 
 export function get_units_array(world: World) {
     return Object.values(world.units)
+}
+
+export function get_occupied_cells(level: Level, world: World, exclude_unit_id?: number): Set<string> {
+    const occupied = new Set<string>();
+    for (const uid of level.units) {
+        if (uid === exclude_unit_id) continue;
+        const unit = world.units[uid];
+        occupied.add(`${unit.pos.x},${unit.pos.y}`);
+    }
+    return occupied;
 }

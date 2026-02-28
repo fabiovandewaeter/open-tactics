@@ -1,19 +1,17 @@
-// lib/game_comtroller.ts
+// lib/game_controller.ts
 import { get } from 'svelte/store';
-import { world_store } from '../stores/world'; // Ton store Svelte
-import { combat_is_active, next_turn_logic, get_current_unit_id, move_unit_in_combat, spawn_combat } from '../../engine/combat';
-import type { Coord, LevelId, UnitId, World } from '../../engine/types';
-import { compute_ai_turn } from '../../engine/combat';
-import type { CombatAction, CombatId, Team, UnitCombatState } from '../../engine/combat_types';
+import { world_store } from '../stores/world';
+import { combat_is_active, next_turn_logic, get_current_unit_id, move_unit_in_combat, spawn_combat, compute_ai_turn_step } from '../../engine/combat';
+import type { Coord, LevelId, UnitId, UnitStats, World } from '../../engine/types';
+import type { Combat, CombatAction, CombatId, Team, UnitCombatState } from '../../engine/combat_types';
 import { add_unit_to_level, create_empty_level, get_active_level, move_unit_in_level } from '../../engine/board';
+import { writable } from 'svelte/store';
 
-/** Retourne le level actuellement affiché, qu'on soit en combat ou en explore. */
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-/**
- * Tente de déplacer une unité. Délègue aux règles du bon contexte.
- * Retourne true si le mouvement est autorisé et effectué.
- */
+export const isAnimating = writable(false);
+export const isPlayerTurn = writable(false);
+
 export function try_move_unit(world: World, unit_id: UnitId, to: Coord): boolean {
     if (world.state.mode === "combat") {
         const combat = world.combats[world.state.combat_id];
@@ -24,9 +22,6 @@ export function try_move_unit(world: World, unit_id: UnitId, to: Coord): boolean
     }
 }
 
-/**
- * Transition explore -> combat
- */
 export function enter_combat(world: World, combat_id: CombatId, combat_level_id: LevelId) {
     if (world.state.mode !== "explore") throw new Error("Already in combat");
     world.state = {
@@ -37,19 +32,11 @@ export function enter_combat(world: World, combat_id: CombatId, combat_level_id:
     };
 }
 
-/**
- * Transition combat -> explore (retour au level d'origine)
- */
 export function exit_combat(world: World) {
     if (world.state.mode !== "combat") throw new Error("Not in combat");
     const origin = world.state.origin_level_id;
     world.state = { mode: "explore", level_id: origin };
 }
-
-// Indicateur pour l'UI : est-ce que le joueur humain peut cliquer ?
-// export let isPlayerTurn = false;
-import { writable } from 'svelte/store';
-export const isPlayerTurn = writable(false);
 
 export async function start_turn_loop() {
     let world = get(world_store);
@@ -66,93 +53,121 @@ export async function start_turn_loop() {
         return;
     }
 
-    const currentUnitId = get_current_unit_id(combat);
-    const unitState = combat.unit_statuses[currentUnitId];
+    const current_unit_id = get_current_unit_id(combat);
+    const unit_state = combat.unit_statuses[current_unit_id];
+    reset_unit_statues_new_turn(combat, current_unit_id, world.units[current_unit_id].max_stats);
 
-    if (unitState.team === "A") {
+    if (unit_state.team === "A") {
         console.log("C'est au JOUEUR de jouer.");
         isPlayerTurn.set(true);
-        // On s'arrête ici. On attend que le joueur clique sur une case via l'UI.
-        // L'UI appellera player_action() quand le clic aura lieu.
     } else {
         console.log("C'est à l'IA de jouer.");
         isPlayerTurn.set(false);
 
-        // 1. Calculer tout le tour
-        const actions = compute_ai_turn(combat, world);
-
-        // 2. Exécuter visuellement
-        for (const action of actions) {
+        let action;
+        do {
+            world = get(world_store);
+            action = compute_ai_turn_step(combat, world);
             await execute_action(action);
-            await sleep(500); // Petite pause entre les actions
-        }
+            await sleep(500);
+        } while (action.type !== "WAIT");
 
-        // 3. Fin du tour IA -> On passe au suivant
         finish_turn();
     }
 }
 
-// Appelé par l'UI (clic joueur) ou la boucle (IA)
-async function execute_action(action: CombatAction) {
-    world_store.update(w => {
-        if (action.type === "MOVE") {
-            const dest = action.path[action.path.length - 1];
-            try_move_unit(w, action.unit_id, dest); // Plus besoin de savoir si combat ou pas
-        }
-        return w;
-    });
-    if (action.type === "MOVE") await sleep(300);
+function reset_unit_statues_new_turn(combat: Combat, id: UnitId, unit_max_stats: UnitStats) {
+    combat.unit_statuses[id].current_stats.mp = unit_max_stats.mp;
 }
 
-// Appelé quand le joueur a fini son clic ou que l'IA a fini ses actions
+/**
+ * Exécute une action. Pour MOVE, anime case par case le long du chemin.
+ */
+export async function execute_action(action: CombatAction) {
+    isAnimating.set(true);
+
+    if (action.type === "MOVE") {
+        // ✅ Anime chaque étape du chemin individuellement
+        // path[0] = case de départ, on commence à path[1]
+        for (let i = 1; i < action.path.length; i++) {
+            const step = action.path[i];
+            world_store.update(w => {
+                try_move_unit(w, action.unit_id, step);
+                return w;
+            });
+            await sleep(150); // pause entre chaque case
+        }
+    }
+
+    isAnimating.set(false);
+}
+
 export function finish_turn() {
+    isPlayerTurn.set(false);
     world_store.update(w => {
-        if (w.state.mode !== "combat") {
-            throw new Error("finish_turn appelé hors combat");
-        }
-
+        if (w.state.mode !== "combat") throw new Error("finish_turn appelé hors combat");
         const combat = w.combats[w.state.combat_id];
-        if (!combat) {
-            throw new Error(`Combat ${w.state.combat_id} not found in world.combats`)
-        }
-
+        if (!combat) throw new Error(`Combat ${w.state.combat_id} not found`);
         next_turn_logic(combat);
         return w;
     });
-    // On relance la boucle pour voir qui est le suivant
     start_turn_loop();
 }
 
-// L'UI appelle ça quand on clique sur une case
-export async function player_attempt_move(target: Coord) {
-    if (!get(isPlayerTurn)) {
-        return;
-    }
+/**
+ * Appelé depuis l'UI avec le chemin complet calculé par find_path.
+ * - Vérifie que la destination est dans reachable_cells (anti-TP).
+ * - Déduit les MP selon path.length - 1.
+ * - Garde le tour si des MP restent.
+ */
+export async function player_attempt_move(path: Coord[], reachable_cells: Set<string>) {
+    if (!get(isPlayerTurn) || get(isAnimating)) return;
 
     const w = get(world_store);
-
-    if (w.state.mode !== "combat") {
-        // Mode explore : déplacement libre du héros sélectionné
-        // TODO: identifier quelle unité le joueur contrôle en explore
-        console.log("Déplacement en explore, à implémenter.");
-        return;
-    }
+    if (w.state.mode !== "combat") return;
 
     const combat = w.combats[w.state.combat_id];
     if (!combat) throw new Error(`Combat ${w.state.combat_id} introuvable`);
 
     const unitId = get_current_unit_id(combat);
+    const unit_status = combat.unit_statuses[unitId];
 
-    // Créer l'action
-    const action: CombatAction = {
-        type: "MOVE",
-        unit_id: unitId,
-        path: [target] // Ici tu devrais calculer le vrai chemin
-    };
+    if (!path || path.length < 2) return;
 
-    isPlayerTurn.set(false); // On bloque les clics pendant l'anim
+    const dest = path[path.length - 1];
+    const dest_key = `${dest.x},${dest.y}`;
+
+    if (!reachable_cells.has(dest_key)) {
+        console.log("Case hors de portée !");
+        return;
+    }
+
+    const cost = path.length - 1;
+
+    if (unit_status.current_stats.mp < cost) {
+        console.log(`Pas assez de MP : besoin de ${cost}, reste ${unit_status.current_stats.mp}`);
+        return;
+    }
+
+    const action: CombatAction = { type: "MOVE", unit_id: unitId, path };
     await execute_action(action);
-    finish_turn(); // Le joueur a fini (mode simple: 1 mouv = fin tour)
+
+    // Déduit les MP après l'animation complète
+    world_store.update(w => {
+        if (w.state.mode !== "combat") throw new Error("Not in combat");
+        const c = w.combats[w.state.combat_id];
+        c.unit_statuses[unitId].current_stats.mp -= cost;
+        return w;
+    });
+
+    const ws = get(world_store);
+    if (ws.state.mode !== "combat") throw new Error("Not in combat");
+    const remaining_mp = ws.combats[ws.state.combat_id].unit_statuses[unitId].current_stats.mp;
+
+    if (remaining_mp <= 0) {
+        console.log("Plus de MP, fin du tour automatique.");
+        finish_turn();
+    }
 }
 
 export function start_combat_from_current_level() {
@@ -170,21 +185,18 @@ export function start_combat_from_current_level() {
             return w;
         }
 
-        // Crée un level de combat (copie de l'explore)
         const combat_level_id: LevelId = w.next_level_id++;
         const combat_level = create_empty_level(combat_level_id, explore_level.board.width, explore_level.board.height);
-        combat_level.board = explore_level.board; // même board
+        combat_level.board = explore_level.board;
         combat_level.structures = explore_level.structures;
         w.levels[combat_level_id] = combat_level;
 
-        // Crée les unit_statuses : moitié équipe A, moitié équipe B
         const unit_statuses: Record<UnitId, UnitCombatState> = {};
         const initiative: UnitId[] = [];
 
         unit_ids.forEach((uid, i) => {
             const unit = w.units[uid];
             const team: Team = i < Math.ceil(unit_ids.length / 2) ? "A" : "B";
-
             unit_statuses[uid] = {
                 id: uid,
                 pos: unit.pos,
@@ -193,12 +205,10 @@ export function start_combat_from_current_level() {
                 has_played: false,
                 current_stats: { ...unit.max_stats },
             };
-
             add_unit_to_level(combat_level, uid);
             initiative.push(uid);
         });
 
-        // Spawn le combat
         const combat_id = spawn_combat(w, {
             unit_statuses,
             current_turn: 1,
@@ -206,12 +216,9 @@ export function start_combat_from_current_level() {
             initiative_index: 0,
         });
 
-        // Transition explore -> combat
         enter_combat(w, combat_id, combat_level_id);
-
         return w;
     });
 
-    // Lance la boucle de tour
     start_turn_loop();
 }

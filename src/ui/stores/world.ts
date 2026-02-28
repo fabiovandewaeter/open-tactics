@@ -10,10 +10,10 @@ const UNIT_HEIGHT_REF = 40;
 
 // Les personnages
 const unit_id_1 = spawn_unit(initial_world, {
-    name: "Rogue", pos: { x: 1, y: 1 }, max_stats: { max_hp: 30, map_mp: 5 }, scale: 1.0, shape: "sprite"
+    name: "Rogue", pos: { x: 1, y: 1 }, max_stats: { hp: 30, mp: 5 }, scale: 1.0, shape: "sprite"
 })
 const unit_id_2 = spawn_unit(initial_world, {
-    name: "Summon", pos: { x: 3, y: 2 }, max_stats: { max_hp: 20, map_mp: 1 }, scale: 1.0, shape: "sprite"
+    name: "Summon", pos: { x: 3, y: 2 }, max_stats: { hp: 20, mp: 3 }, scale: 1.0, shape: "sprite"
 })
 
 add_unit_to_level(initial_level, unit_id_1);

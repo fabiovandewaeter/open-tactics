@@ -43,21 +43,22 @@ export function move_unit_in_combat(combat: Combat, unit_id: UnitId, to: Coord, 
     return true
 }
 
-export function compute_ai_turn(combat: Combat, world: World): CombatAction[] {
+export function compute_ai_turn_step(combat: Combat, world: World): CombatAction {
     const unit_id = get_current_unit_id(combat);
     const unit = world.units[unit_id];
+    let unit_statuses: UnitCombatState = combat.unit_statuses[unit_id];
 
     // LOGIQUE DUMB : L'IA bouge d'une case vers la droite si possible
-    const actions: CombatAction[] = [];
-
-    // Ici tu mettrais ton A* (Pathfinding)
-    // Simulasation d'un mouvement : case actuelle -> case à droite
-    const path = [unit.pos, { x: unit.pos.x + 1, y: unit.pos.y }];
-
-    actions.push({ type: "MOVE", unit_id, path });
-    actions.push({ type: "WAIT", unit_id }); // Fin du tour obligatoire
-
-    return actions;
+    if (unit_statuses.current_stats.mp > 0) {
+        // TODO: Ici tu mettrais ton A* (Pathfinding)
+        // Simulasation d'un mouvement : case actuelle -> case à droite
+        const path = [unit.pos, { x: unit.pos.x + 1, y: unit.pos.y }];
+        unit_statuses.current_stats.mp--;
+        return { type: "MOVE", unit_id, path };
+    }
+    else {
+        return { type: "WAIT", unit_id };
+    }
 }
 
 // Vérifie si le combat continue (au moins 1 vivant dans chaque équipe)

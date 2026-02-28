@@ -7,8 +7,8 @@ export type StructureId = number
 export type LevelId = number
 
 export type UnitStats = {
-    max_hp: number,
-    map_mp: number // mouvement points
+    hp: number,
+    mp: number // mouvement points
 }
 
 export type Unit = {
