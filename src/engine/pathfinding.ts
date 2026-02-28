@@ -1,8 +1,9 @@
+// engine/pathfinding.ts
 import type { Coord, Level, World } from "./types";
-import { get_elevation_at, MAX_STEP_HEIGHT } from "./board";
 
+/** Manhattan */
 function heuristic(a: Coord, b: Coord): number {
-    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); // Manhattan
+    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
 function coord_key(c: Coord) {
@@ -23,13 +24,18 @@ function get_neighbors(pos: Coord, level: Level): Coord[] {
         );
 }
 
+/** Retourne true si la case contient une structure qui bloque le passage */
+function is_blocked_by_structure(level: Level, pos: Coord): boolean {
+    const struct = Object.values(level.structures).find(
+        s => s.pos.x === pos.x && s.pos.y === pos.y
+    );
+    // Bloque si la structure existe ET n'est pas walkable
+    return struct !== undefined && !struct.walkable;
+}
+
 function is_passable(level: Level, world: World, from: Coord, to: Coord, occupied: Set<string>): boolean {
     if (occupied.has(coord_key(to))) return false;
-
-    const elev_from = get_elevation_at(level, from);
-    const elev_to = get_elevation_at(level, to);
-    if (Math.abs(elev_to - elev_from) > MAX_STEP_HEIGHT) return false;
-
+    if (is_blocked_by_structure(level, to)) return false;
     return true;
 }
 
@@ -61,7 +67,6 @@ export function find_path(
     all_nodes.set(start_key, start_node);
 
     while (open.size > 0) {
-        // Nœud avec le plus petit f
         let current_key = "";
         let current_node: AStarNode = { coord: from, g: Infinity, f: Infinity, parent: null };
         for (const [k, v] of open) {
@@ -69,7 +74,6 @@ export function find_path(
         }
 
         if (current_key === goal_key) {
-            // ✅ FIX: Reconstruction depuis all_nodes (pas open qui a supprimé les nœuds fermés)
             const path: Coord[] = [];
             let key: string | null = current_key;
             while (key) {
@@ -94,12 +98,12 @@ export function find_path(
             if (!existing || g < existing.g) {
                 const new_node = { coord: neighbor, g, f: g + heuristic(neighbor, to), parent: current_key };
                 open.set(nk, new_node);
-                all_nodes.set(nk, new_node); // ✅ Toujours synchroniser all_nodes
+                all_nodes.set(nk, new_node);
             }
         }
     }
 
-    return null; // Pas de chemin
+    return null;
 }
 
 /** Toutes les cases atteignables en max `mp` pas */

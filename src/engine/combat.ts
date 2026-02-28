@@ -1,7 +1,8 @@
 // engine/combat.ts
-import { get_active_level, get_elevation_at } from "./board";
 import type { Combat, CombatAction, CombatId, UnitCombatState } from "./combat_types";
+import { get_elevation_at } from "./map/level";
 import type { UnitId, Coord, World, Unit, Level } from "./types";
+import { get_active_level } from "./world";
 
 export function spawn_combat(world: World, combat_partial: Omit<Combat, "id">): CombatId {
     const id: CombatId = world.next_combat_id++;

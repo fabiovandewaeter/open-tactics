@@ -1,7 +1,8 @@
 // engine/world.ts
 import { writable } from "svelte/store"
 import type { World } from "../../engine/types"
-import { add_unit_to_level, create_default_world, spawn_structure, spawn_unit } from "../../engine/board"
+import { create_default_world, spawn_unit } from "../../engine/world";
+import { add_unit_to_level, spawn_structure } from "../../engine/map/level";
 
 const initial_world = create_default_world();
 const initial_level = initial_world.levels[1];
@@ -25,8 +26,7 @@ spawn_structure(initial_level, {
     pos: { x: 5, y: 5 },
     shape: "cube",
     height: UNIT_HEIGHT_REF,
-    walkable: true,
-    elevation_change: UNIT_HEIGHT_REF
+    walkable: false
 })
 
 spawn_structure(initial_level, {
@@ -34,32 +34,28 @@ spawn_structure(initial_level, {
     pos: { x: 5, y: 6 },
     shape: "step",
     height: UNIT_HEIGHT_REF,
-    walkable: true,
-    elevation_change: UNIT_HEIGHT_REF / 2
+    walkable: false
 })
 spawn_structure(initial_level, {
     name: "Marche",
     pos: { x: 6, y: 5 },
     shape: "step",
     height: UNIT_HEIGHT_REF,
-    walkable: true,
-    elevation_change: UNIT_HEIGHT_REF / 2
+    walkable: false
 })
 spawn_structure(initial_level, {
     name: "Marche",
     pos: { x: 4, y: 5 },
     shape: "step",
     height: UNIT_HEIGHT_REF,
-    walkable: true,
-    elevation_change: UNIT_HEIGHT_REF / 2
+    walkable: false
 })
 spawn_structure(initial_level, {
     name: "Marche",
     pos: { x: 5, y: 4 },
     shape: "step",
     height: UNIT_HEIGHT_REF,
-    walkable: true,
-    elevation_change: UNIT_HEIGHT_REF / 2
+    walkable: false
 })
 
 export const world_store = writable<World>(initial_world)

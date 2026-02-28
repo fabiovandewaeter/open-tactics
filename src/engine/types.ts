@@ -16,18 +16,17 @@ export type Unit = {
     name: string
     pos: Coord,
     max_stats: UnitStats,
-    scale: number
+    scale: number,
     shape: "sprite"
 }
 
 export type Structure = {
-    id: StructureId
-    name: string
-    pos: Coord
-    shape: string // "cube", "wedge-nw", etc.
-    height: number // Hauteur physique de la structure (ex: 40)
-    walkable: boolean // Est-ce qu'on peut monter dessus ?
-    elevation_change: number // De combien ça monte (ex: 40 pour cube, 40 pour wedge)
+    id: StructureId,
+    name: string,
+    pos: Coord,
+    shape: string, // "cube", "wedge-nw", etc.
+    height: number,
+    walkable: boolean
 }
 
 export type Tile = {

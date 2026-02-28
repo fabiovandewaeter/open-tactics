@@ -2,11 +2,6 @@
 <script lang="ts">
     import { world_store } from "../stores/world";
     import characterSvg from "../assets/character.svg";
-    import {
-        get_active_level,
-        get_elevation_at,
-        get_occupied_cells,
-    } from "../../engine/board";
     import { onMount } from "svelte";
     import {
         finish_turn,
@@ -19,6 +14,11 @@
     import { get_current_unit_id } from "../../engine/combat";
     import { get_reachable_cells, find_path } from "../../engine/pathfinding";
     import type { Coord } from "../../engine/types";
+    import {
+        get_elevation_at,
+        get_occupied_cells,
+    } from "../../engine/map/level";
+    import { get_active_level } from "../../engine/world";
 
     const TILE_W = 80;
     const TILE_H = 40;

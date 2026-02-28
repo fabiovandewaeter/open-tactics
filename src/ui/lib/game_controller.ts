@@ -4,8 +4,9 @@ import { world_store } from '../stores/world';
 import { combat_is_active, next_turn_logic, get_current_unit_id, move_unit_in_combat, spawn_combat, compute_ai_turn_step } from '../../engine/combat';
 import type { Coord, LevelId, UnitId, UnitStats, World } from '../../engine/types';
 import type { Combat, CombatAction, CombatId, Team, UnitCombatState } from '../../engine/combat_types';
-import { add_unit_to_level, create_empty_level, get_active_level, move_unit_in_level } from '../../engine/board';
 import { writable } from 'svelte/store';
+import { move_unit_in_level, create_empty_level, add_unit_to_level } from '../../engine/map/level';
+import { get_active_level } from '../../engine/world';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -69,7 +70,7 @@ export async function start_turn_loop() {
             world = get(world_store);
             action = compute_ai_turn_step(combat, world);
             await execute_action(action);
-            await sleep(500);
+            await sleep(150);
         } while (action.type !== "WAIT");
 
         finish_turn();
