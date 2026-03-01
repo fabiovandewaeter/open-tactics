@@ -104,3 +104,40 @@ export function get_shape_faces(
         return create_box(0, 0, 0, 0.5, 0.5, height / 2);
     return create_box(0, 0, 0, 0.2, 0.2, height * 0.5);
 }
+
+// Calcule le polygone englobant toutes les faces d'une structure
+// pour le hotspot de détection de survol — couvre toute la hauteur visible
+export function get_structure_hit_polygon(
+    shape_type: string,
+    cx: number,
+    cy: number,
+    height: number,
+): string {
+    const p = (lx: number, ly: number, lz: number) =>
+        project_3D(cx, cy, lx, ly, lz, 1);
+
+    // On veut couvrir le contour extérieur de la structure vue de dessus
+    // En iso : les 4 coins du bas + les coins hauts visibles
+    if (shape_type === "cube" || shape_type === "step") {
+        const h = shape_type === "step" ? height / 2 : height;
+        const topN = p(-0.5, -0.5, h);
+        const topE = p(0.5, -0.5, h);
+        const topS = p(0.5, 0.5, h);
+        const topW = p(-0.5, 0.5, h);
+        const botE = p(0.5, -0.5, 0); // coin bas de la face droite
+        const botS = p(0.5, 0.5, 0);
+        const botW = p(-0.5, 0.5, 0);
+        // Contour complet : N → E (haut) → botE (bas face droite) → botS → botW → W (haut)
+        return [topN, topE, botE, botS, botW, topW].join(" ");
+    }
+
+    // Pour les wedges et autres, contour complet avec toutes les faces
+    const topN = p(-0.5, -0.5, height);
+    const topE = p(0.5, -0.5, height);
+    const topS = p(0.5, 0.5, height);
+    const topW = p(-0.5, 0.5, height);
+    const botE = p(0.5, -0.5, 0);
+    const botS = p(0.5, 0.5, 0);
+    const botW = p(-0.5, 0.5, 0);
+    return [topN, topE, botE, botS, botW, topW].join(" ");
+}

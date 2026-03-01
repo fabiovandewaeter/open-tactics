@@ -1,5 +1,5 @@
 <script lang="ts">
-  import IsoBoard from "./components/IsoBoard.svelte";
+  import IsoBoard from "./components/iso_board.svelte";
 </script>
 
 <main>
