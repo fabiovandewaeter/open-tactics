@@ -91,11 +91,44 @@
         hovered_path = new Set();
     }
 
+    // Navigation clavier
+    let focused_tile: { x: number; y: number } | null = null;
+    let keyboard_cursor: string | null = null;
     // reset cursor when moving with keyboard
     $: if ($isPlayerTurn) {
         focused_tile = null;
         keyboard_cursor = null;
     }
+
+    $: render_items = (() => {
+        const items: Array<{
+            type: "tile" | "unit" | "structure" | "structure-hotspot";
+            z: number;
+            data: any;
+        }> = [];
+        active_level.board.tiles.forEach((t) =>
+            items.push({ type: "tile", z: t.x + t.y, data: t }),
+        );
+        structures.forEach((s) => {
+            items.push({ type: "structure", z: s.pos.x + s.pos.y, data: s });
+        });
+        units.forEach((u) => {
+            const zBonus = get_elevation_at(active_level, u.pos) > 0 ? 0.1 : 0;
+            items.push({
+                type: "unit",
+                z: u.pos.x + u.pos.y + zBonus,
+                data: u,
+            });
+        });
+        return items.sort((a, b) => {
+            if (a.z === b.z) {
+                if (a.type === "tile") return -1;
+                if (a.type === "structure" && b.type === "unit") return -1;
+                return 1;
+            }
+            return a.z - b.z;
+        });
+    })();
 
     function on_tile_hover(x: number, y: number) {
         if (!$isPlayerTurn || $isAnimating || world.state.mode !== "combat")
@@ -136,10 +169,6 @@
         hovered_path = new Set();
         hovered_dest = null;
     }
-
-    // Navigation clavier
-    let focused_tile: { x: number; y: number } | null = null;
-    let keyboard_cursor: string | null = null;
 
     function handle_svg_keydown(e: KeyboardEvent) {
         const W = active_level.board.width;
@@ -215,36 +244,6 @@
             await player_explore_move(path, unit.id);
         }
     }
-
-    $: render_items = (() => {
-        const items: Array<{
-            type: "tile" | "unit" | "structure" | "structure-hotspot";
-            z: number;
-            data: any;
-        }> = [];
-        active_level.board.tiles.forEach((t) =>
-            items.push({ type: "tile", z: t.x + t.y, data: t }),
-        );
-        structures.forEach((s) => {
-            items.push({ type: "structure", z: s.pos.x + s.pos.y, data: s });
-        });
-        units.forEach((u) => {
-            const zBonus = get_elevation_at(active_level, u.pos) > 0 ? 0.1 : 0;
-            items.push({
-                type: "unit",
-                z: u.pos.x + u.pos.y + zBonus,
-                data: u,
-            });
-        });
-        return items.sort((a, b) => {
-            if (a.z === b.z) {
-                if (a.type === "tile") return -1;
-                if (a.type === "structure" && b.type === "unit") return -1;
-                return 1;
-            }
-            return a.z - b.z;
-        });
-    })();
 </script>
 
 <div class="board-container">
@@ -279,11 +278,9 @@
                         on_leave={clear_hover}
                     />
                 {:else if item.type === "structure"}
-                    <!--
-                La structure est rendue normalement, mais sans pointer-events.
-                Le hotspot (ci-dessous dans le z-order) gère hover/click.
-                On applique l'opacité via style inline pour éviter tout conflit CSS.
-            -->
+                    <!-- La structure est rendue normalement, mais sans pointer-events.
+                    Le hotspot (ci-dessous dans le z-order) gère hover/click.
+                    On applique l'opacité via style inline pour éviter tout conflit CSS. -->
                     <IsoStructure
                         structure={item.data}
                         is_hovered={hovered_structure_id === item.data.id}
