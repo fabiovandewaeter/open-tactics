@@ -14,23 +14,22 @@
     } from "../lib/game_controller";
     import { get_current_unit_id } from "../../engine/combat";
     import { get_reachable_cells, find_path } from "../../engine/pathfinding";
-    import type { Coord } from "../../engine/types";
     import {
         get_elevation_at,
         get_occupied_cells,
     } from "../../engine/map/level";
     import { get_active_level } from "../../engine/world";
     import { get } from "svelte/store";
-
-    const TILE_W = 80;
-    const TILE_H = 40;
-    const SPRITE_W = 50;
-    const SPRITE_H = 60;
-
-    // On centre l'origine sur (0,0) en coordonnées SVG brutes,
-    // puis on calcule le viewBox exact autour du plateau.
-    const ORIGIN_X = 0;
-    const ORIGIN_Y = 0;
+    import {
+        get_shape_faces,
+        iso_to_screen,
+        project_3D,
+        SPRITE_H,
+        SPRITE_W,
+        TILE_H,
+        tile_polygon,
+        TILE_W,
+    } from "../lib/isometric";
 
     // Calcule le viewBox serré autour du plateau avec une marge
     $: viewBox = (() => {
@@ -63,8 +62,18 @@
     $: units = active_level.units.map((id) => world.units[id]);
     $: structures = Object.values(active_level.structures);
 
+    let svg_el: SVGElement;
     onMount(() => {
         start_turn_loop();
+        const handle_keydown = (e: KeyboardEvent) => {
+            // Ignore si le focus est sur un input/button
+            const tag = (e.target as HTMLElement).tagName;
+            if (tag === "BUTTON" || tag === "INPUT") return;
+            handle_svg_keydown(e);
+        };
+
+        window.addEventListener("keydown", handle_keydown);
+        return () => window.removeEventListener("keydown", handle_keydown);
     });
 
     let reachable_cells = new Set<string>();
@@ -88,6 +97,12 @@
     } else if (!$isPlayerTurn) {
         reachable_cells = new Set();
         hovered_path = new Set();
+    }
+
+    // reset cursor when moving with keyboard
+    $: if ($isPlayerTurn) {
+        focused_tile = null;
+        keyboard_cursor = null;
     }
 
     function on_tile_hover(x: number, y: number) {
@@ -132,17 +147,26 @@
 
     // Navigation clavier
     let focused_tile: { x: number; y: number } | null = null;
+    let keyboard_cursor: string | null = null;
 
     function handle_svg_keydown(e: KeyboardEvent) {
-        if (!$isPlayerTurn || $isAnimating || world.state.mode !== "combat")
-            return;
-
         const W = active_level.board.width;
         const H = active_level.board.height;
 
+        if (world.state.mode === "combat") {
+            if (!$isPlayerTurn || $isAnimating) return;
+        } else {
+            if ($isAnimating) return;
+        }
+
         if (!focused_tile) {
-            // Démarre au centre si rien n'est focusé
-            focused_tile = { x: Math.floor(W / 2), y: Math.floor(H / 2) };
+            if (world.state.mode === "combat") {
+                const combat = world.combats[world.state.combat_id];
+                const unit_id = get_current_unit_id(combat);
+                focused_tile = { ...world.units[unit_id].pos };
+            } else {
+                focused_tile = { ...units[0].pos };
+            }
             on_tile_hover(focused_tile.x, focused_tile.y);
             return;
         }
@@ -159,20 +183,8 @@
 
         e.preventDefault();
         focused_tile = { x, y };
+        keyboard_cursor = `${x},${y}`;
         on_tile_hover(x, y);
-    }
-
-    function iso_to_screen(x: number, y: number, zOffset: number = 0) {
-        const sx = (x - y) * (TILE_W / 2);
-        const sy = (x + y) * (TILE_H / 2) - zOffset;
-        return { sx: sx + ORIGIN_X, sy: sy + ORIGIN_Y };
-    }
-
-    function tile_polygon(x: number, y: number) {
-        const { sx, sy } = iso_to_screen(x, y);
-        const hw = TILE_W / 2;
-        const hh = TILE_H / 2;
-        return `${sx},${sy - hh} ${sx + hw},${sy} ${sx},${sy + hh} ${sx - hw},${sy}`;
     }
 
     async function cell_click(x: number, y: number) {
@@ -249,89 +261,6 @@
         });
     })();
 
-    function project_3D(
-        cx: number,
-        cy: number,
-        lx: number,
-        ly: number,
-        lz: number,
-        scale: number,
-    ) {
-        const sx = cx + (lx - ly) * (TILE_W / 2) * scale;
-        const sy = cy + (lx + ly) * (TILE_H / 2) * scale - lz;
-        return `${sx},${sy}`;
-    }
-
-    type Face = { points: string[]; type: "top" | "left" | "right" };
-
-    function get_shape_faces(
-        shape_type: string,
-        cx: number,
-        cy: number,
-        scale: number,
-        height: number,
-    ): Face[] {
-        const p = (lx: number, ly: number, lz: number) =>
-            project_3D(cx, cy, lx, ly, lz, scale);
-        const create_box = (
-            ox: number,
-            oy: number,
-            oz: number,
-            w: number,
-            d: number,
-            h: number,
-        ): Face[] => {
-            const topN = p(ox - w, oy - d, oz + h),
-                topE = p(ox + w, oy - d, oz + h);
-            const topS = p(ox + w, oy + d, oz + h),
-                topW = p(ox - w, oy + d, oz + h);
-            const bot_s = p(ox + w, oy + d, oz),
-                bot_e = p(ox + w, oy - d, oz),
-                botW = p(ox - w, oy + d, oz);
-            return [
-                { type: "top", points: [topN, topE, topS, topW] },
-                { type: "right", points: [topE, topS, bot_s, bot_e] },
-                { type: "left", points: [topW, topS, bot_s, botW] },
-            ];
-        };
-        if (shape_type === "cube") return create_box(0, 0, 0, 0.5, 0.5, height);
-        const n = p(-0.5, -0.5, height),
-            n0 = p(-0.5, -0.5, 0);
-        const e = p(0.5, -0.5, height),
-            e0 = p(0.5, -0.5, 0);
-        const s = p(0.5, 0.5, height),
-            s0 = p(0.5, 0.5, 0);
-        const w = p(-0.5, 0.5, height),
-            w0 = p(-0.5, 0.5, 0);
-        if (shape_type === "wedge-nw")
-            return [
-                { type: "left", points: [w, s0, w0] },
-                { type: "right", points: [n, e0, n0] },
-                { type: "top", points: [n, e0, s0, w] },
-            ];
-        if (shape_type === "wedge-ne")
-            return [
-                { type: "left", points: [n, w0, n0] },
-                { type: "right", points: [e, s0, e0] },
-                { type: "top", points: [n, e, s0, w0] },
-            ];
-        if (shape_type === "wedge-se")
-            return [
-                { type: "left", points: [w0, s, s0] },
-                { type: "right", points: [e, s, s0, e0] },
-                { type: "top", points: [n0, e, s, w0] },
-            ];
-        if (shape_type === "wedge-sw")
-            return [
-                { type: "left", points: [w, s, s0, w0] },
-                { type: "right", points: [e0, s, s0] },
-                { type: "top", points: [n0, e0, s, w] },
-            ];
-        if (shape_type === "step")
-            return create_box(0, 0, 0, 0.5, 0.5, height / 2);
-        return create_box(0, 0, 0, 0.2, 0.2, height * 0.5);
-    }
-
     // Calcule le polygone englobant toutes les faces d'une structure
     // pour le hotspot de détection de survol — couvre toute la hauteur visible
     function get_structure_hit_polygon(
@@ -381,9 +310,7 @@
             {@const unit_id = get_current_unit_id(combat)}
             {@const mp = combat.unit_statuses[unit_id].current_stats.mp}
             <span>🟦 Ton tour — <strong>{mp} MP</strong> restants</span>
-            <button class="end-turn-btn" on:click={finish_turn}
-                >✅ Fin du tour</button
-            >
+            <button class="end-turn-btn"> ✅ Fin du tour </button>
         {:else}
             <span>🔴 IA en train de jouer...</span>
         {/if}
@@ -392,8 +319,10 @@
     <div class="board-wrapper">
         <svg
             aria-label="Isometric board"
-            role="img"
+            role="grid"
+            tabindex="0"
             {viewBox}
+            bind:this={svg_el}
             on:mouseleave={() => {
                 hovered_structure_id = null;
                 clear_hover();
@@ -408,6 +337,7 @@
                         class:reachable={reachable_cells.has(key)}
                         class:path-hover={hovered_path.has(key)}
                         class:dest-hover={hovered_dest === key}
+                        class:keyboard-focus={keyboard_cursor === key}
                         points={tile_polygon(item.data.x, item.data.y)}
                         data-x={item.data.x}
                         data-y={item.data.y}
